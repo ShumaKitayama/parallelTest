@@ -1,0 +1,98 @@
+projectOverview:
+  summary: >
+    This project conducts a distributed processing experiment by running a
+    2D integral calculation across multiple physical nodes. Python workers
+    are launched inside Docker containers, and the integral region is
+    divided among the nodes. We measure computation time and system resource
+    usage (CPU, memory) to observe the speedup gained from parallel
+    execution. The main goal is to isolate the calculation time as much
+    as possible from communication overhead by using a complex integral.
+    Task transmission and result collection are managed via Redis to improve
+    communication efficiency and scalability.
+
+configurationFiles:
+  Master.py: >
+    - Runs outside of Docker.
+    - Starts and stops the Docker containers.
+    - Reads task.json to determine the integral equation and calculation range.
+    - Uses Redis to distribute tasks to Worker.py containers and to collect
+      partial results.
+    - Divides the calculation range among the number of worker containers
+      and places tasks into Redis, which Worker.py listens to.
+    - Receives partial results from each worker through Redis and aggregates
+      them into a final value.
+    - Initiates and terminates Benchmark.py at the appropriate time.
+    - Outputs the final calculation result to /output/output.txt and writes
+      benchmark data to /output/benchmark.txt.
+  Benchmark.py: >
+    - Runs outside of Docker.
+    - Records start and end times, and calculates elapsed time.
+    - Monitors CPU and memory usage between the start and end times.
+    - Sends all gathered benchmark data to Master.py. (Optionally, this can also
+      be piped through Redis if desired, but final file writing is done by Master.py.)
+  Worker.py: >
+    - Runs inside a Docker container.
+    - Fetches tasks from Redis, which Master.py has placed there, containing
+      the integral range segment and integral equation.
+    - Implements the calculation process without using additional libraries,
+      to ensure the computation is self-contained.
+    - Waits for Benchmark.py to start before beginning the heavy calculation.
+    - Publishes the result back to Redis, which Master.py then collects.
+  Dockerfile: >
+    - Defines the environment for Worker.py inside a Docker container.
+    - Includes Python installation and setup needed to run Worker.py.
+  docker-compose.yml: >
+    - Manages multi-container Docker setup along with a Redis service.
+    - Enables scaling the number of Worker.py containers (nodes) to 1, 2, 3,
+      or more.
+    - Includes configuration for running a Redis instance to handle message
+      passing between Master.py and Worker.py.
+  task.json: >
+    - Stores the integral equation and the calculation range (e.g., x-range, y-range).
+    - Provides any additional parameters needed for the computation.
+
+outputFiles:
+  output.txt: >
+    - Created by Master.py.
+    - Stores the aggregated calculation result from all Worker.py containers.
+  benchmark.txt: >
+    - Created by Master.py.
+    - Stores the benchmark results, including elapsed time and CPU/memory usage,
+      after receiving them from Benchmark.py.
+
+workflow:
+  step1: "Launch Master.py."
+  step2: >
+    Master.py reads task.json, determines the total integral range, and
+    starts Docker containers for each Worker.py along with a Redis service.
+  step3: >
+    Master.py places the tasks (range segments and integral formula) into
+    Redis. Each Worker.py fetches a task from Redis and waits until
+    Benchmark.py begins recording before starting calculations.
+  step4: >
+    Master.py launches Benchmark.py, which records the start time and monitors
+    CPU/memory usage.
+  step5: >
+    Worker.py executes the 2D integral calculation. The process is designed to be
+    computation-intensive to minimize communication overhead in measurements.
+  step6: >
+    Upon completion, Worker.py publishes the result to Redis, which Master.py
+    subscribes to or polls. When all workers finish, Master.py instructs
+    Benchmark.py to stop, and Benchmark.py sends its data (end time, resource usage)
+    back to Master.py.
+  step7: >
+    Master.py aggregates partial results into a final integral value, writes
+    the result to /output/output.txt, and records the benchmark data in
+    /output/benchmark.txt.
+  step8: >
+    Master.py stops Docker containers (including the Redis service) and
+    concludes the overall process.
+
+notes:
+  - >
+    This approach helps evaluate the performance gain from increasing the number
+    of nodes for parallel computation. The integral function is intentionally
+    complex so that computation time dominates over communication overhead.  
+    Using Redis as a message broker provides a scalable way to manage task
+    distribution and result collection, especially when the number of workers
+    grows.  
