@@ -47,7 +47,7 @@ CPU・メモリ使用量や経過時間などを計測します。
 
 ---
 
-## ディレクトリ構成（例）
+## ディレクトリ構成
 
 ```bash
 .
@@ -68,13 +68,13 @@ CPU・メモリ使用量や経過時間などを計測します。
 
 1. **環境準備**  
    - ホストマシン上で Python (3.x) 仮想環境などを用意し、  
-     `pip install redis psutil` など必要ライブラリをインストールする。  
+     `pip install redis psutil` をインストールする。  
    - Docker / Docker Compose がインストールされていることを確認。
 
 2. **task.json の内容を設定**  
    - 積分する式 (`equation`)、範囲 (`x_start`, `x_end`, `y_start`, `y_end`)、ステップ幅 (`step`) を調整する。
 
-3. **必要に応じて Dockerfile の修正**  
+3. **Dockerfileの調整**  
    - `RUN pip install redis numpy` など、Worker に必要なパッケージを追加する。  
    - 変更後は `docker-compose build` または `docker build .` でイメージを再ビルド。
 
@@ -82,7 +82,7 @@ CPU・メモリ使用量や経過時間などを計測します。
    ```bash
    python Master.py
    ```
-   - 自動的に `docker-compose up -d --scale worker=4` を実行し、Redis + Worker 4台を起動。  
+   - 自動的に `docker-compose up -d --scale worker=n` を実行し、Redis + Worker n台を起動。
    - 5秒程度待機したのち、タスクを Redis に投入。  
    - Benchmark.py をサブプロセスで起動し、「計測開始」の合図を Worker に送る。  
    - Worker が計算を終えて結果を返すと、集計して `output/output.txt` に書き出し。  
